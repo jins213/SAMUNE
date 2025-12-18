@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube サムネイル保存ツール</title>
+    <style>
+        /* --- CSS Styles --- */
+        :root {
+            --primary-color: #ff0000; /* YouTube Red */
+            --bg-color: #f9f9f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-radius: 12px;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: 40px 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #222;
+        }
+
+        /* 入力エリアのデザイン */
+        .input-group {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.3s;
+            min-width: 200px;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: #cc0000;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* 結果表示エリア */
+        #result-area {
+            margin-top: 30px;
+            display: none; /* 初期状態は非表示 */
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .thumb-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            text-align: left;
+        }
+
+        .thumb-card h3 {
+            margin-top: 0;
+            font-size: 18px;
+            color: #555;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .thumb-wrapper {
+            position: relative;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #eee;
+        }
+
+        .thumb-wrapper img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-download {
+            text-decoration: none;
+            background-color: #333;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: inline-block;
+        }
+
+        .btn-download:hover {
+            background-color: #555;
+        }
+
+        .note {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        /* モバイル対応 */
+        @media (max-width: 600px) {
+            .container { margin: 20px 10px; }
+            .input-group { flex-direction: column; }
+            button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>YouTube サムネイル取得ツール</h1>
+    
+    <div class="input-group">
+        <input type="text" id="url-input" placeholder="YouTubeの動画URLを貼り付けてください (例: https://youtu.be/...)">
+        <button onclick="getThumbnail()">取得する</button>
+    </div>
+
+    <div id="result-area">
+        </div>
+</div>
+
+<script>
+    /* --- JavaScript Logic --- */
+    function getThumbnail() {
+        const input = document.getElementById('url-input').value;
+        const resultArea = document.getElementById('result-area');
+        
+        // YouTubeのIDを抽出する正規表現
+        const videoId = extractVideoID(input);
+
+        if (!videoId) {
+            alert("有効なYouTubeのURLを入力してください。");
+            return;
+        }
+
+        // 結果エリアをクリアして表示
+        resultArea.innerHTML = '';
+        resultArea.style.display = 'flex';
+
+        // 画質リストの定義
+        const qualities = [
+            { name: "最高画質 (Max Resolution)", code: "maxresdefault", desc: "※動画によっては存在しない場合があります" },
+            { name: "高画質 (High Quality)", code: "hqdefault", desc: "" },
+            { name: "標準画質 (Standard Quality)", code: "sddefault", desc: "" },
+            { name: "中画質 (Medium Quality)", code: "mqdefault", desc: "" }
+        ];
+
+        qualities.forEach(q => {
+            const imgUrl = `https://img.youtube.com/vi/${videoId}/${q.code}.jpg`;
+            
+            // カードHTMLの生成
+            const cardHtml = `
+                <div class="thumb-card">
+                    <h3>${q.name}</h3>
+                    <div class="thumb-wrapper">
+                        <img src="${imgUrl}" alt="Thumbnail" onload="checkImage(this)">
+                    </div>
+                    <div class="actions">
+                        <a href="${imgUrl}" target="_blank" class="btn-download">新しいタブで開く</a>
+                    </div>
+                    <div class="note">
+                        ${q.desc ? q.desc + '<br>' : ''}
+                        保存するには：「新しいタブで開く」→ 画像を長押し/右クリックして保存
+                    </div>
+                </div>
+            `;
+            resultArea.innerHTML += cardHtml;
+        });
+    }
+
+    // URLから動画IDを抽出する関数
+    function extractVideoID(url) {
+        const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[7].length == 11) ? match[7] : false;
+    }
+
+    // 画像が存在しない場合（グレー画像など）の簡易チェック用（今回は表示制御のみ）
+    function checkImage(img) {
+        // YouTubeは画像がない場合、幅120pxのデフォルト画像を返すことがあるため
+        // 必要であればここで非表示処理などが可能ですが、今回はそのまま表示します。
+    }
+</script>
+
+</body>
+</html>
